@@ -1,31 +1,43 @@
-import base64
 import os
 import tempfile
+import time
 from pathlib import Path
 
-import anthropic
-import cv2
+import google.generativeai as genai
 import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Support both Streamlit Cloud secrets and local .env
-ANTHROPIC_API_KEY = (
-    st.secrets.get("ANTHROPIC_API_KEY")
+GEMINI_API_KEY = (
+    st.secrets.get("GEMINI_API_KEY")
     if hasattr(st, "secrets")
     else None
-) or os.getenv("ANTHROPIC_API_KEY")
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+) or os.getenv("GEMINI_API_KEY")
 
-MAX_FRAMES = 20
-FRAME_WIDTH = 1280
-JPEG_QUALITY = 85
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+MODEL_NAME = "gemini-1.5-flash"
 
 SUPPORTED_EXTENSIONS = {".mp4", ".mov", ".avi", ".webm", ".mkv", ".mpeg", ".mpg", ".3gp", ".wmv", ".flv"}
 
+MIME_TYPES = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".webm": "video/webm",
+    ".mkv": "video/x-matroska",
+    ".mpeg": "video/mpeg",
+    ".mpg": "video/mpeg",
+    ".3gp": "video/3gpp",
+    ".wmv": "video/x-ms-wmv",
+    ".flv": "video/x-flv",
+}
+
 ANALYSIS_PROMPT = (
-    "Please provide a comprehensive analysis of this video based on the sampled frames above. Include:\n"
+    "Please provide a comprehensive analysis of this video. Include:\n"
     "1. Overall summary and narrative arc\n"
     "2. Key subjects, people, or objects visible\n"
     "3. Notable scenes, actions, or events with approximate timestamps\n"
@@ -40,112 +52,63 @@ def init_session_state():
         "messages": [],
         "video_analysis": None,
         "analysis_complete": False,
+        "chat_session": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
 
 
-def extract_frames(video_path: str) -> tuple[list[tuple[float, str]], float]:
-    cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    duration = total_frames / fps if fps > 0 else 0
+def upload_and_wait(video_path: str, mime_type: str):
+    """Upload video to Gemini File API and wait until processing is complete."""
+    video_file = genai.upload_file(path=video_path, mime_type=mime_type)
 
-    num_frames = min(MAX_FRAMES, total_frames)
-    if num_frames == 0:
-        cap.release()
-        raise ValueError("Could not read any frames from the video file.")
+    # Poll until the file is ready (usually a few seconds)
+    while video_file.state.name == "PROCESSING":
+        time.sleep(2)
+        video_file = genai.get_file(video_file.name)
 
-    frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+    if video_file.state.name == "FAILED":
+        raise ValueError("Gemini failed to process the video file.")
 
-    frames = []
-    for idx in frame_indices:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = cap.read()
-        if not ret:
-            continue
-        timestamp = idx / fps
-
-        h, w = frame.shape[:2]
-        if w > FRAME_WIDTH:
-            scale = FRAME_WIDTH / w
-            frame = cv2.resize(frame, (FRAME_WIDTH, int(h * scale)))
-
-        _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-        b64 = base64.b64encode(buffer).decode("utf-8")
-        frames.append((timestamp, b64))
-
-    cap.release()
-
-    if not frames:
-        raise ValueError("No frames could be extracted from the video.")
-
-    return frames, duration
+    return video_file
 
 
-def analyze_video_with_claude(video_path: str) -> str:
-    frames, duration = extract_frames(video_path)
+def analyze_video_with_gemini(video_path: str, mime_type: str) -> tuple[str, object]:
+    """Upload video, analyze it, and return (analysis_text, video_file)."""
+    video_file = upload_and_wait(video_path, mime_type)
 
-    mins = int(duration // 60)
-    secs = int(duration % 60)
-    duration_str = f"{mins}:{secs:02d}"
-
-    content = []
-    for i, (timestamp, b64) in enumerate(frames):
-        ts_mins = int(timestamp // 60)
-        ts_secs = int(timestamp % 60)
-        content.append({
-            "type": "text",
-            "text": f"**Frame {i + 1} — {ts_mins}:{ts_secs:02d}**"
-        })
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}
-        })
-
-    content.append({
-        "type": "text",
-        "text": (
-            f"The {len(frames)} frames above are sampled evenly from a {duration_str}-long video.\n\n"
-            + ANALYSIS_PROMPT
-        )
-    })
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": content}]
+    model = genai.GenerativeModel(MODEL_NAME)
+    response = model.generate_content(
+        [video_file, ANALYSIS_PROMPT],
+        request_options={"timeout": 120},
     )
-    return response.content[0].text
+    return response.text, video_file
 
 
-def chat_with_claude(user_message: str) -> str:
-    system_prompt = (
-        "You are a helpful assistant answering questions about a video. "
-        "You analyzed the video by examining evenly-sampled frames and produced "
-        "the following analysis:\n\n"
-        f"{st.session_state.video_analysis}\n\n"
-        "Use this analysis to answer the user's questions accurately and helpfully. "
-        "If a question cannot be answered from the visual analysis alone, say so clearly."
+def start_chat_session(video_file, analysis: str):
+    """Start a Gemini chat session with video + analysis as context."""
+    model = genai.GenerativeModel(
+        MODEL_NAME,
+        system_instruction=(
+            "You are a helpful assistant answering questions about a video. "
+            "You have access to the full video and the following pre-generated analysis:\n\n"
+            f"{analysis}\n\n"
+            "Use both the video and the analysis to answer questions accurately. "
+            "If a question cannot be answered from the video, say so clearly."
+        ),
     )
-
-    st.session_state.messages.append({"role": "user", "content": user_message})
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=2048,
-        system=system_prompt,
-        messages=st.session_state.messages
-    )
-    reply = response.content[0].text
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-    return reply
+    # Seed the history with the video so the model can reference it
+    chat = model.start_chat(history=[
+        {"role": "user", "parts": [video_file, "I've shared this video with you for reference."]},
+        {"role": "model", "parts": ["Got it! I've reviewed the video and I'm ready to answer your questions."]},
+    ])
+    return chat
 
 
 def main():
     st.set_page_config(
-        page_title="Video Analysis with Claude",
+        page_title="Video Analysis with Gemini",
         page_icon="🎬",
         layout="wide",
     )
@@ -153,12 +116,13 @@ def main():
     init_session_state()
 
     st.title("Video Analysis Assistant")
-    st.caption("Upload a video — Claude analyzes the frames, then you can ask questions about it.")
+    st.caption("Upload a video — Gemini analyzes it natively, then you can ask questions about it.")
 
-    if not ANTHROPIC_API_KEY:
+    if not GEMINI_API_KEY:
         st.error(
-            "**Missing API key.** On Streamlit Cloud: go to **Manage app → Secrets** and add "
-            "`ANTHROPIC_API_KEY = \"your-key-here\"`. Locally: set it in a `.env` file."
+            "**Missing API key.** Get a free key at [Google AI Studio](https://aistudio.google.com/app/apikey). "
+            "On Streamlit Cloud: go to **Manage app → Secrets** and add "
+            "`GEMINI_API_KEY = \"your-key-here\"`. Locally: set it in a `.env` file."
         )
         st.stop()
 
@@ -182,37 +146,36 @@ def main():
         st.session_state.analysis_complete = False
         st.session_state.video_analysis = None
         st.session_state.messages = []
+        st.session_state.chat_session = None
 
         suffix = Path(uploaded_file.name).suffix.lower() or ".mp4"
+        mime_type = MIME_TYPES.get(suffix, "video/mp4")
         tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
                 tmp_file.write(uploaded_file.getvalue())
                 tmp_path = tmp_file.name
 
-            with st.spinner(
-                f"Extracting up to {MAX_FRAMES} frames and analyzing with Claude... "
-                "This may take a moment for longer videos."
-            ):
-                analysis = analyze_video_with_claude(tmp_path)
+            with st.spinner("Uploading video and analyzing with Gemini... This may take a moment."):
+                analysis, video_file = analyze_video_with_gemini(tmp_path, mime_type)
+                chat = start_chat_session(video_file, analysis)
 
             st.session_state.video_analysis = analysis
+            st.session_state.chat_session = chat
             st.session_state.analysis_complete = True
             st.success("Analysis complete! Scroll down to ask questions.")
 
         except ValueError as e:
             st.error(f"Video error: {e}")
-        except anthropic.APIError as e:
-            st.error(f"Claude API error: {e}")
         except Exception as e:
-            st.error(f"Unexpected error: {e}")
+            st.error(f"Error: {e}")
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
     # --- Section 2: Analysis ---
     if st.session_state.analysis_complete and st.session_state.video_analysis:
-        st.header("2. Claude's Video Analysis")
+        st.header("2. Gemini's Video Analysis")
         with st.expander("View Full Analysis", expanded=True):
             st.markdown(st.session_state.video_analysis)
 
@@ -220,7 +183,7 @@ def main():
 
         # --- Section 3: Chat ---
         st.header("3. Ask Questions About the Video")
-        st.caption("Claude has the full analysis above as context for every answer.")
+        st.caption("Gemini has the full video and analysis as context for every answer.")
 
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
@@ -238,12 +201,13 @@ def main():
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     try:
-                        reply = chat_with_claude(user_input)
+                        response = st.session_state.chat_session.send_message(user_input)
+                        reply = response.text
                         st.markdown(reply)
-                    except anthropic.APIError as e:
-                        st.error(f"Claude API error: {e}")
+                        st.session_state.messages.append({"role": "user", "content": user_input})
+                        st.session_state.messages.append({"role": "assistant", "content": reply})
                     except Exception as e:
-                        st.error(f"Unexpected error: {e}")
+                        st.error(f"Error: {e}")
 
 
 if __name__ == "__main__":
