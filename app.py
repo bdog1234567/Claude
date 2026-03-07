@@ -10,7 +10,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+# Support both Streamlit Cloud secrets and local .env
+ANTHROPIC_API_KEY = (
+    st.secrets.get("ANTHROPIC_API_KEY")
+    if hasattr(st, "secrets")
+    else None
+) or os.getenv("ANTHROPIC_API_KEY")
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
 MAX_FRAMES = 20
@@ -152,8 +157,8 @@ def main():
 
     if not ANTHROPIC_API_KEY:
         st.error(
-            "**Missing API key.** Please set `ANTHROPIC_API_KEY` in a `.env` file "
-            "(copy `.env.example` as a starting point), then restart the app."
+            "**Missing API key.** On Streamlit Cloud: go to **Manage app → Secrets** and add "
+            "`ANTHROPIC_API_KEY = \"your-key-here\"`. Locally: set it in a `.env` file."
         )
         st.stop()
 
