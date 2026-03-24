@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PromptHub - AI Prompt Engineering for Creators",
+  title: "VibePrompt - AI Prompt Engineering for Creators",
   description:
     "The ultimate hub for AI content creators. Generate perfect prompts for Midjourney, DALL-E, Stable Diffusion, Runway, and more.",
 };

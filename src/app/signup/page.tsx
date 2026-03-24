@@ -42,10 +42,10 @@ export default function SignupPage() {
         <div className="mb-8 text-center">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <span className="text-xl font-bold text-white">P</span>
+              <span className="text-xl font-bold text-white">V</span>
             </div>
             <span className="text-2xl font-bold">
-              Prompt<span className="text-primary-light">Hub</span>
+              Vibe<span className="text-primary-light">Prompt</span>
             </span>
           </Link>
           <h1 className="mt-6 text-2xl font-bold">Create your account</h1>

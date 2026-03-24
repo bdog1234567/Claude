@@ -12,10 +12,10 @@ export default function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <span className="text-lg font-bold text-white">P</span>
+              <span className="text-lg font-bold text-white">V</span>
             </div>
             <span className="text-xl font-bold text-text-primary">
-              Prompt<span className="text-primary-light">Hub</span>
+              Vibe<span className="text-primary-light">Prompt</span>
             </span>
           </Link>
 

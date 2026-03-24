@@ -191,12 +191,12 @@ export default function HomePage() {
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-                <span className="text-xs font-bold text-white">P</span>
+                <span className="text-xs font-bold text-white">V</span>
               </div>
-              <span className="text-sm font-semibold">PromptHub</span>
+              <span className="text-sm font-semibold">VibePrompt</span>
             </div>
             <p className="text-sm text-text-secondary">
-              &copy; 2026 PromptHub. All rights reserved.
+              &copy; 2026 VibePrompt. All rights reserved.
             </p>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { GenerationType, ImageModel, VideoModel } from "@/types";
 export function buildSystemPrompt(
   mode: "brainstorm" | "generate" | "extract"
 ): string {
-  const base = `You are PromptHub AI, an expert assistant for AI content creators. You specialize in crafting precise, detailed prompts for image and video generation models.`;
+  const base = `You are VibePrompt AI, an expert assistant for AI content creators. You specialize in crafting precise, detailed prompts for image and video generation models.`;
 
   if (mode === "brainstorm") {
     return `${base}
