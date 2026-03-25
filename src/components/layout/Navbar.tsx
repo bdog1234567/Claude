@@ -27,12 +27,6 @@ export default function Navbar() {
               Pricing
             </Link>
             <Link
-              href="/login"
-              className="text-text-secondary transition-colors hover:text-text-primary"
-            >
-              Log in
-            </Link>
-            <Link
               href="/dashboard"
               className="rounded-lg bg-primary px-4 py-2 font-medium text-white transition-colors hover:bg-primary-light"
             >
@@ -77,12 +71,6 @@ export default function Navbar() {
                 className="text-text-secondary transition-colors hover:text-text-primary"
               >
                 Pricing
-              </Link>
-              <Link
-                href="/login"
-                className="text-text-secondary transition-colors hover:text-text-primary"
-              >
-                Log in
               </Link>
               <Link
                 href="/dashboard"
