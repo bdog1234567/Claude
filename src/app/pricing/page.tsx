@@ -61,7 +61,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/signup"
+                  href="/dashboard"
                   className={`block w-full rounded-lg py-3 text-center font-medium transition-colors ${
                     tier.popular
                       ? "bg-primary text-white hover:bg-primary-light"

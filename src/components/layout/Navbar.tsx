@@ -27,16 +27,10 @@ export default function Navbar() {
               Pricing
             </Link>
             <Link
-              href="/login"
-              className="text-text-secondary transition-colors hover:text-text-primary"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
+              href="/dashboard"
               className="rounded-lg bg-primary px-4 py-2 font-medium text-white transition-colors hover:bg-primary-light"
             >
-              Get Started Free
+              Try It Now
             </Link>
           </div>
 
@@ -79,16 +73,10 @@ export default function Navbar() {
                 Pricing
               </Link>
               <Link
-                href="/login"
-                className="text-text-secondary transition-colors hover:text-text-primary"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/signup"
+                href="/dashboard"
                 className="rounded-lg bg-primary px-4 py-2 text-center font-medium text-white transition-colors hover:bg-primary-light"
               >
-                Get Started Free
+                Try It Now
               </Link>
             </div>
           </div>
