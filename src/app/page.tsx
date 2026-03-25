@@ -23,10 +23,10 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link
-                href="/signup"
+                href="/dashboard"
                 className="glow rounded-xl bg-primary px-8 py-3.5 text-lg font-semibold text-white transition-all hover:bg-primary-light"
               >
-                Start Creating Free
+                Start Creating — No Signup Needed
               </Link>
               <Link
                 href="/pricing"
@@ -170,7 +170,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <Link
-                  href="/signup"
+                  href="/dashboard"
                   className={`block w-full rounded-lg py-2.5 text-center text-sm font-medium transition-colors ${
                     tier.popular
                       ? "bg-primary text-white hover:bg-primary-light"
